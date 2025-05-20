@@ -1,19 +1,38 @@
 import { exec } from "child_process";
-import { config } from "../config";
+import { platform } from "os";
 
-export function playSound(speech?: string) {
-  const text = speech ? speech : config.token_buy.play_sound_text;
-  const command = `powershell -Command "(New-Object -com SAPI.SpVoice).speak('${text}')"`;
-  exec(command, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`Error: ${error.message}`);
-      return false;
+export function playSound(text?: string): void {
+  const os = platform();
+
+  if (os === "win32") {
+    try {
+      const command = text
+        ? `powershell -c "Add-Type -AssemblyName System.Speech; (New-Object System.Speech.Synthesis.SpeechSynthesizer).Speak('${text}')"`
+        : `powershell -c "(New-Object System.Media.SoundPlayer).PlaySync('C:\\Windows\\Media\\notify.wav')"`;
+
+      exec(command, (error) => {
+        if (error) {
+          console.error("Error playing sound:", error);
+        }
+      });
+    } catch (error) {
+      console.error("Error executing sound command:", error);
     }
-    if (stderr) {
-      console.error(`stderr: ${stderr}`);
-      return false;
+  } else if (os === "darwin") {
+    try {
+      const command = text
+        ? `say "${text}"`
+        : `afplay /System/Library/Sounds/Glass.aiff`;
+
+      exec(command, (error) => {
+        if (error) {
+          console.error("Error playing sound:", error);
+        }
+      });
+    } catch (error) {
+      console.error("Error executing sound command:", error);
     }
-    console.log("Speech executed successfully");
-    return true;
-  });
+  } else {
+    console.log("Sound notifications are only supported on Windows and macOS");
+  }
 }

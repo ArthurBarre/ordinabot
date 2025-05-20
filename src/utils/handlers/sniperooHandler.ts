@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { AxiosError } from "axios";
 import { validateEnv } from "../env-validator";
 
 /**
@@ -7,55 +7,67 @@ import { validateEnv } from "../env-validator";
  * @param inputAmount Amount of SOL to spend
  * @returns Boolean indicating if the purchase was successful
  */
-export async function buyToken(tokenAddress: string, inputAmount: number, sell: boolean, tp: number, sl: number): Promise<boolean> {
+export async function buyToken(
+  mintAddress: string,
+  solAmount: number,
+  enableAutoSell: boolean,
+  takeProfitPercent: number,
+  stopLossPercent: number
+): Promise<boolean> {
   try {
     const env = validateEnv();
 
     // Validate inputs
-    if (!tokenAddress || typeof tokenAddress !== "string" || tokenAddress.trim() === "") {
+    if (!mintAddress || typeof mintAddress !== "string" || mintAddress.trim() === "") {
       return false;
     }
 
-    if (inputAmount <= 0) {
+    if (solAmount <= 0) {
       return false;
     }
 
-    if (!tp || !sl) {
-      sell = false;
+    if (!takeProfitPercent || !stopLossPercent) {
+      enableAutoSell = false;
     }
 
     // Prepare request body
     const requestBody = {
       walletAddresses: [env.SNIPEROO_PUBKEY],
-      tokenAddress: tokenAddress,
-      inputAmount: inputAmount,
+      tokenAddress: mintAddress,
+      inputAmount: solAmount,
       autoSell: {
-        enabled: sell,
+        enabled: enableAutoSell,
         strategy: {
           strategyName: "simple",
-          profitPercentage: tp,
-          stopLossPercentage: sl,
+          profitPercentage: takeProfitPercent,
+          stopLossPercentage: stopLossPercent,
         },
       },
     };
 
     // Make API request using axios
-    const response = await axios.post("https://api.sniperoo.app/trading/buy-token?toastFrontendId=0", requestBody, {
+    const response = await axios.post("https://api.sniperoo.xyz/v1/buy", requestBody, {
       headers: {
         Authorization: `Bearer ${env.SNIPEROO_API_KEY}`,
         "Content-Type": "application/json",
       },
     });
 
-    // Axios automatically throws an error for non-2xx responses,
-    // so if we get here, the request was successful
-    return true;
+    if (response.status === 200) {
+      return true;
+    }
+
+    console.error("Sniperoo API error:", response.data);
+    return false;
   } catch (error) {
-    // Handle axios errors
     if (axios.isAxiosError(error)) {
-      console.error(`Sniperoo API error (${error.response?.status || "unknown"}):`, error.response?.data || error.message);
+      const axiosError = error as AxiosError;
+      console.error(
+        `Sniperoo API error (${axiosError.response?.status || "unknown"}):`,
+        axiosError.response?.data || axiosError.message
+      );
     } else {
-      console.error("Error buying token:", error instanceof Error ? error.message : "Unknown error");
+      console.error("Unexpected error:", error);
     }
     return false;
   }
