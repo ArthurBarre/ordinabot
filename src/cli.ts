@@ -6,6 +6,8 @@ import { traceFundsStrategy } from './strategies/traceFunds';
 import { baseTradingStrategy } from './strategies/baseTrading';
 import { followWalletStrategy } from './strategies/followWallet';
 import { buyLastNodeStrategy } from './strategies/buyLastNode';
+import { buyAllSoldStrategy } from './strategies/buyAllSold';
+import { backtraceFundsStrategy } from './strategies/backtraceFunds';
 import { Strategy } from './core/types';
 import 'dotenv/config';
 
@@ -18,7 +20,9 @@ const strategies = {
   traceFunds: traceFundsStrategy,
   baseTrading: baseTradingStrategy,
   followWallet: followWalletStrategy,
-  buyLastNode: buyLastNodeStrategy
+  buyLastNode: buyLastNodeStrategy,
+  buyAllSold: buyAllSoldStrategy,
+  backtraceFunds: backtraceFundsStrategy
 };
 
 // Configuration des paramètres pour chaque stratégie
@@ -71,6 +75,68 @@ const strategyParams = {
         return 'Depth must be between 1 and 200';
       }
     }
+  ],
+  buyAllSold: [
+    {
+      type: 'input',
+      name: 'walletToFollow',
+      message: 'Enter the wallet address to follow:',
+      validate: (input: string) => {
+        if (input.length === 44 || input.length === 43) {
+          return true;
+        }
+        return 'Please enter a valid Solana address (43-44 characters)';
+      }
+    }
+  ],
+  backtraceFunds: [
+    {
+      type: 'input',
+      name: 'targetAddress',
+      message: 'Enter the target address to backtrace:',
+      validate: (input: string) => {
+        if (input.length === 44 || input.length === 43) {
+          return true;
+        }
+        return 'Please enter a valid Solana address (43-44 characters)';
+      }
+    },
+    {
+      type: 'number',
+      name: 'minAmount',
+      message: 'Enter minimum SOL amount to trace:',
+      default: 0.1,
+      validate: (input: number) => {
+        if (input > 0) {
+          return true;
+        }
+        return 'Amount must be greater than 0';
+      }
+    },
+    {
+      type: 'number',
+      name: 'maxAmount',
+      message: 'Enter maximum SOL amount to trace:',
+      default: 100,
+      validate: (input: number, answers: any) => {
+        if (input > answers.minAmount) {
+          return true;
+        }
+        return 'Maximum amount must be greater than minimum amount';
+      }
+    },
+    {
+      type: 'number',
+      name: 'maxDepth',
+      message: 'Enter maximum trace depth:',
+      default: 5,
+      validate: (input: number) => {
+        if (input > 0 && input <= 200) {
+          return true;
+        }
+        return 'Depth must be between 1 and 200';
+      }
+    }
   ]
 };
 
@@ -95,6 +161,13 @@ async function runStrategy(strategyName: string) {
         process.env.TRACE_MIN_AMOUNT = params.minAmount.toString();
         process.env.TRACE_MAX_AMOUNT = params.maxAmount.toString();
         process.env.TRACE_MAX_DEPTH = params.maxDepth.toString();
+      } else if (strategyName === 'buyAllSold') {
+        process.env.WALLET_TO_FOLLOW = params.walletToFollow;
+      } else if (strategyName === 'backtraceFunds') {
+        process.env.BACKTRACE_TARGET_ADDRESS = params.targetAddress;
+        process.env.BACKTRACE_MIN_AMOUNT = params.minAmount.toString();
+        process.env.BACKTRACE_MAX_AMOUNT = params.maxAmount.toString();
+        process.env.BACKTRACE_MAX_DEPTH = params.maxDepth.toString();
       }
     }
 

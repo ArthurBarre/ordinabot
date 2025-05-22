@@ -2,10 +2,18 @@ import TelegramBot from 'node-telegram-bot-api';
 import { snifferStrategy } from '../strategies/sniffer';
 import { copytradingStrategy } from '../strategies/copytrading';
 import { traceFundsStrategy } from '../strategies/traceFunds';
+import { backtraceFundsStrategy } from '../strategies/backtraceFunds';
 import { validateEnv } from '../utils/env-validator';
 
 interface TraceConfig {
   rootAddress: string;
+  minAmount: number;
+  maxAmount: number;
+  maxDepth: number;
+}
+
+interface BacktraceConfig {
+  targetAddress: string;
   minAmount: number;
   maxAmount: number;
   maxDepth: number;
@@ -16,6 +24,7 @@ interface ActiveStrategies {
   sniffer: boolean;
   copytrading: boolean;
   traceFunds: boolean;
+  backtraceFunds: boolean;
 }
 
 class TelegramBotManager {
@@ -24,10 +33,12 @@ class TelegramBotManager {
   private activeStrategies: ActiveStrategies = {
     sniffer: false,
     copytrading: false,
-    traceFunds: false
+    traceFunds: false,
+    backtraceFunds: false
   };
   private originalConsole: typeof console;
   private pendingTraceConfig: Partial<TraceConfig> = {};
+  private pendingBacktraceConfig: Partial<BacktraceConfig> = {};
 
   constructor() {
     const env = validateEnv();
@@ -103,6 +114,9 @@ class TelegramBotManager {
           break;
         case 'traceFunds':
           await traceFundsStrategy.run();
+          break;
+        case 'backtraceFunds':
+          await backtraceFundsStrategy.run();
           break;
       }
     } catch (error: any) {
@@ -219,32 +233,170 @@ class TelegramBotManager {
     }
   }
 
+  private async handleBacktraceFundsCommand(msg: TelegramBot.Message, match: RegExpExecArray | null) {
+    if (!match || match.length < 5) {
+      await this.bot.sendMessage(this.chatId,
+        'Usage: /backtrace_funds <address> <minAmount> <maxAmount> <maxDepth>\n' +
+        'Example: /backtrace_funds 7YttLkHDoNj9wyDur5pYeS7UJs7oKFSynuFQnTrqS2h 0.1 10 3'
+      );
+      return;
+    }
+
+    const [, address, minAmountStr, maxAmountStr, maxDepthStr] = match;
+
+    // Validate address
+    if (address.length !== 44 && address.length !== 43) {
+      await this.bot.sendMessage(this.chatId, '❌ Invalid Solana address (must be 43-44 characters)');
+      return;
+    }
+
+    // Validate amounts
+    const minAmount = parseFloat(minAmountStr);
+    const maxAmount = parseFloat(maxAmountStr);
+    const maxDepth = parseInt(maxDepthStr);
+
+    if (isNaN(minAmount) || minAmount <= 0) {
+      await this.bot.sendMessage(this.chatId, '❌ Minimum amount must be greater than 0');
+      return;
+    }
+
+    if (isNaN(maxAmount) || maxAmount <= minAmount) {
+      await this.bot.sendMessage(this.chatId, '❌ Maximum amount must be greater than minimum amount');
+      return;
+    }
+
+    if (isNaN(maxDepth) || maxDepth <= 0 || maxDepth > 200) {
+      await this.bot.sendMessage(this.chatId, '❌ Depth must be between 1 and 200');
+      return;
+    }
+
+    // Store configuration
+    this.pendingBacktraceConfig = {
+      targetAddress: address,
+      minAmount,
+      maxAmount,
+      maxDepth
+    };
+
+    // Start the strategy
+    await this.startBacktraceFunds();
+  }
+
+  private async startBacktraceFunds(): Promise<void> {
+    if (this.activeStrategies.backtraceFunds) {
+      await this.bot.sendMessage(this.chatId, '⚠️ Backtrace Funds is already running');
+      return;
+    }
+
+    if (!this.pendingBacktraceConfig.targetAddress) {
+      await this.bot.sendMessage(this.chatId, '❌ No backtrace configuration set. Use /backtrace_funds command first.');
+      return;
+    }
+
+    this.activeStrategies.backtraceFunds = true;
+    await this.bot.sendMessage(this.chatId,
+      `✅ Starting Backtrace Funds...\n` +
+      `📍 Target address: ${this.pendingBacktraceConfig.targetAddress}\n` +
+      `💰 Amount range: ${this.pendingBacktraceConfig.minAmount} - ${this.pendingBacktraceConfig.maxAmount} SOL\n` +
+      `🔍 Maximum depth: ${this.pendingBacktraceConfig.maxDepth}`
+    );
+
+    try {
+      // Set environment variables for the strategy
+      process.env.BACKTRACE_TARGET_ADDRESS = this.pendingBacktraceConfig.targetAddress;
+      process.env.BACKTRACE_MIN_AMOUNT = this.pendingBacktraceConfig.minAmount?.toString();
+      process.env.BACKTRACE_MAX_AMOUNT = this.pendingBacktraceConfig.maxAmount?.toString();
+      process.env.BACKTRACE_MAX_DEPTH = this.pendingBacktraceConfig.maxDepth?.toString();
+
+      await backtraceFundsStrategy.run();
+
+      // Clean up environment variables
+      delete process.env.BACKTRACE_TARGET_ADDRESS;
+      delete process.env.BACKTRACE_MIN_AMOUNT;
+      delete process.env.BACKTRACE_MAX_AMOUNT;
+      delete process.env.BACKTRACE_MAX_DEPTH;
+    } catch (error: any) {
+      console.error('Error in backtraceFunds:', error);
+      this.activeStrategies.backtraceFunds = false;
+      await this.bot.sendMessage(this.chatId, `❌ Backtrace Funds crashed: ${error.message}`);
+    }
+  }
+
   public start() {
     // Command handlers
     this.bot.onText(/\/start_sniffer/, () => this.startStrategy('sniffer'));
     this.bot.onText(/\/start_copytrading/, () => this.startStrategy('copytrading'));
     this.bot.onText(/\/trace_funds\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)/, (msg, match) => this.handleTraceFundsCommand(msg, match));
+    this.bot.onText(/\/backtrace_funds\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)\s+([^\s]+)/, (msg, match) => this.handleBacktraceFundsCommand(msg, match));
     this.bot.onText(/\/stop/, () => this.stopAllStrategies());
     this.bot.onText(/\/status/, () => this.getStatus());
+    this.bot.onText(/\/help/, async (msg) => {
+      const helpMessage = `
+🤖 *OrdinaBot Help*
+
+*Available Commands:*
+
+📊 *Basic Commands:*
+/help - Show this help message
+/status - Check running strategies
+/stop - Stop all running strategies
+
+🔍 *Sniffer & Copytrading:*
+/start_sniffer - Start token sniffer
+/start_copytrading - Start copy trading
+
+🔄 *Fund Tracing:*
+/trace_funds <address> <minAmount> <maxAmount> <maxDepth>
+- Track outgoing funds from an address
+- Example: \`/trace_funds 7YttLkHDoNj9wyDur5pYeS7UJs7oKFSynuFQnTrqS2h 0.1 10 3\`
+- Parameters:
+  • address: Solana wallet address (43-44 chars)
+  • minAmount: Minimum SOL amount to track (e.g. 0.1)
+  • maxAmount: Maximum SOL amount to track (e.g. 10)
+  • maxDepth: How many levels deep to trace (1-200)
+
+🔍 *Fund Backtracing:*
+/backtrace_funds <address> <minAmount> <maxAmount> <maxDepth>
+- Track incoming funds to an address
+- Example: \`/backtrace_funds 7YttLkHDoNj9wyDur5pYeS7UJs7oKFSynuFQnTrqS2h 0.1 10 3\`
+- Parameters: Same as trace_funds
+
+*Tips:*
+• All amounts are in SOL
+• Depth of 3-5 is recommended for most cases
+• Keep amount range reasonable (e.g. 0.1-10 SOL)
+• All console logs will be streamed here in real-time
+`;
+
+      await this.bot.sendMessage(msg.chat.id, helpMessage, { parse_mode: 'Markdown' });
+    });
 
     // Welcome message
     this.bot.onText(/\/start/, async (msg: TelegramBot.Message) => {
       const welcome = `
 🤖 Welcome to OrdinaBot!
 
-Available commands:
-/start_sniffer - Start token sniffer
-/start_copytrading - Start copy trading
-/trace_funds <address> <minAmount> <maxAmount> <maxDepth> - Start fund tracing
-/stop - Stop all strategies
-/status - Check running strategies
-
-Example:
-/trace_funds 7YttLkHDoNj9wyDur5pYeS7UJs7oKFSynuFQnTrqS2h 0.1 10 3
+Type /help to see all available commands and how to use them.
 
 All console logs will be streamed here in real-time.
 `;
       await this.bot.sendMessage(msg.chat.id, welcome);
+    });
+
+    // Add error handling for commands
+    this.bot.on('message', async (msg) => {
+      const text = msg.text;
+      if (!text) return;
+
+      // Check if it's a command but not handled by other handlers
+      if (text.startsWith('/')) {
+        const command = text.split(' ')[0];
+        const validCommands = ['/start', '/help', '/status', '/stop', '/start_sniffer', '/start_copytrading', '/trace_funds', '/backtrace_funds'];
+
+        if (!validCommands.some(cmd => command === cmd)) {
+          await this.bot.sendMessage(msg.chat.id, '❌ Invalid command. Type /help to see available commands.');
+        }
+      }
     });
 
     console.log('🤖 Telegram bot started');

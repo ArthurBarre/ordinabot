@@ -21,14 +21,94 @@ With customizable parameters, you can tailor the strategy to suit your needs. Th
 - Possibility to set own RPC nodes
 - Snipe using JITO sniper Sniperoo
 
+### Available Strategies
+
+The bot includes several trading strategies that can be run independently:
+
+#### 1. Base Trading Strategy (`baseTrading`)
+- Core trading strategy using TokenTrackerApp
+- Configurable parameters for token buying and selling
+- Includes rug checks, liquidity pool monitoring, and market analysis
+- Supports stop-loss and take-profit functionality
+- Uses JITO for priority transactions
+
+#### 2. Sniffer Strategy (`sniffer`)
+- Monitors all token program transactions on Solana
+- Tracks wallets making frequent token purchases
+- Identifies active traders and potential pump signals
+- Logs wallet activity and purchase patterns
+- Useful for identifying trending tokens and active traders
+
+#### 3. Copytrading Strategy (`copytrading`)
+- Automatically copies trades from successful wallets
+- Monitors a predefined list of expert traders
+- Detects token purchases and replicates them
+- Uses Jupiter for swap execution
+- Includes transaction validation and error handling
+
+#### 4. Trace Funds Strategy (`traceFunds`)
+- Recursively traces SOL transfers between wallets
+- Configurable parameters:
+  - Root address to start tracing from
+  - Minimum and maximum SOL amounts to track
+  - Maximum trace depth
+- Generates detailed transfer trees
+- Exports results with wallet links and statistics
+- Useful for investigating fund flows and wallet relationships
+
+#### 5. Follow Wallet Strategy (`followWallet`)
+- Similar to copytrading but focuses on a single wallet
+- Monitors specific wallet for token swap instructions
+- Particularly watches Jupiter program interactions
+- Provides real-time notifications of purchases
+- Includes Solscan links for purchased tokens
+
+#### 6. Buy Last Node Strategy (`buyLastNode`)
+- Tracks a specific starting address
+- Follows fund transfers to find the last wallet in a chain
+- Monitors for new token creation by the final wallet
+- Useful for catching new token launches early
+
+#### 7. Buy All Sold Strategy (`buyAllSold`)
+- Monitors a specific wallet for token transfers
+- When the watched wallet sells/transfers a token:
+  - Automatically identifies the token address
+  - Attempts to buy the same token using Sniperoo
+- Useful for reverse psychology trading (buying what others sell)
+- Real-time WebSocket monitoring for instant execution
+
 ### Prerequisites, Installation and Usage Instructions
 
 1. Ensure [Node.js](https://nodejs.org/en) is installed on your computer.
 2. Clone the repository to your local machine.
 3. Navigate to the project folder and run the following command to install all dependencies: "npm i"
-4. To start the sniper, run: "npm run dev"
-5. To start the tracker, run: "npm run tracker"
-6. Optional: To start the sniper and tracker after being compiled, run: "npm run start" and "npm run start:tracker"
+4. Create a `.env` file with your configuration:
+   ```env
+   HELIUS_API_KEY=your_helius_api_key
+   SNIPEROO_API_KEY=your_sniperoo_api_key
+   SNIPEROO_PUBKEY=your_sniperoo_pubkey
+   ```
+
+### Running Strategies
+
+You can run strategies in two ways:
+
+1. Using the CLI:
+   ```bash
+   npm run cli list              # List all available strategies
+   npm run cli strategy <name>   # Run a specific strategy
+   ```
+
+2. Using the Telegram bot:
+   ```bash
+   npm run bot                   # Start the Telegram bot
+   ```
+   Then use these commands in Telegram:
+   - `/start_sniffer` - Start token sniffer
+   - `/start_copytrading` - Start copy trading
+   - `/trace_funds <address> <minAmount> <maxAmount> <maxDepth>` - Start fund tracing
+   - `/stop` - Stop all strategies
+   - `/status` - Check running strategies
 
 ### Third Party documentation
 
