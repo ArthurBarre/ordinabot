@@ -4,6 +4,8 @@ import { baseTradingStrategy } from './strategies/baseTrading';
 import { buyLastNodeStrategy } from './strategies/buyLastNode';
 import { followWalletStrategy } from './strategies/followWallet';
 import { snifferStrategy } from './strategies/sniffer';
+import { copytradingStrategy } from './strategies/copytrading';
+import { traceFundsStrategy } from './strategies/traceFunds';
 
 // Use require for inquirer since it's CommonJS
 const inquirer = require('inquirer');
@@ -13,6 +15,8 @@ const strategies: Strategy[] = [
   buyLastNodeStrategy,
   followWalletStrategy,
   snifferStrategy,
+  copytradingStrategy,
+  traceFundsStrategy,
 ];
 
 async function selectStrategy(): Promise<Strategy> {

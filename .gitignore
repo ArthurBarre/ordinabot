@@ -34,3 +34,5 @@ next-env.d.ts
 # Project Personal Files
 tokens.db
 myConfig.ts
+
+exports/*
