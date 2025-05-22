@@ -231,6 +231,17 @@ function calculateStats(tree: TransferNode[]): { totalAmount: number; maxDepth: 
 }
 
 async function promptConfig(): Promise<TraceConfig> {
+  // If environment variables are set, use them
+  if (process.env.TRACE_ROOT_ADDRESS) {
+    return {
+      rootAddress: process.env.TRACE_ROOT_ADDRESS,
+      minAmount: parseFloat(process.env.TRACE_MIN_AMOUNT || '0.1'),
+      maxAmount: parseFloat(process.env.TRACE_MAX_AMOUNT || '100'),
+      maxDepth: parseInt(process.env.TRACE_MAX_DEPTH || '3')
+    };
+  }
+
+  // Otherwise use interactive prompt
   const questions = [
     {
       type: 'input',

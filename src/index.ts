@@ -8,7 +8,7 @@ const API_KEY = process.env.HELIUS_API_KEY || '950a6725-e50f-4a59-b71d-7326a5800
 const RPC_URL = `https://mainnet.helius-rpc.com/?api-key=${API_KEY}`;
 const WS_URL = `wss://mainnet.helius-rpc.com/?api-key=${API_KEY}`;
 
-async function main() {
+async function startTracker() {
   const checkMode = config.checks.mode as CheckMode;
   if (!['snipe', 'full', 'none'].includes(checkMode)) {
     throw new Error(`Invalid check mode: ${checkMode}`);
@@ -43,4 +43,9 @@ async function main() {
   app.start();
 }
 
-main().catch(console.error);
+// Check if we're in bot mode
+if (process.env.MODE === 'bot') {
+  import('./telegram/telegramBot').then(mod => mod.launchTelegramBot());
+} else {
+  startTracker().catch(console.error);
+}
