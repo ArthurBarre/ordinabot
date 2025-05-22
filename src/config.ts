@@ -51,11 +51,11 @@ export const config = {
       block_symbols: ["XXX"],
       block_names: ["XXX"],
       // Warning
-      min_total_lp_providers: 999,
-      min_total_markets: 999,
-      min_total_market_Liquidity: 5000,
+      min_total_lp_providers: 1,
+      min_total_markets: 1,
+      min_total_market_Liquidity: 100,
       // Misc
-      ignore_ends_with_pump: true,
+      ignore_ends_with_pump: false,
       max_score: 1, // Set to 0 to ignore
     },
   },

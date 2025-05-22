@@ -62,7 +62,7 @@ export interface CheckSettings {
   maxScore: number;
 }
 
-export type StrategyType = 'buyLastNode' | 'baseTrading' | 'followWallet';
+export type StrategyType = 'buyLastNode' | 'baseTrading' | 'followWallet' | 'sniffer';
 
 export interface Strategy {
   name: string;
